@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <base target="_top">
+    <style>
+      html, body {
+        height:100%;
+        width:100%;
+        margin:0;
+        padding:0;
+      }
+
+      a { display: block; }
+
+      #wrapper {
+        height:100%;
+        width:100%;
+        display:grid;
+        grid-template-columns: 20% 1fr;
+        grid-template-areas: "left right";
+        grid-gap: 10px;
+        padding:10px;
+        box-sizing: border-box;
+      }
+
+      #left {
+        grid-area: left;
+        background-color: #efefef;
+        padding:10px;
+      }
+
+      #left input[type="text"], select {
+        width: 90%;
+        font-size:14px;
+        height:40px;
+      }
+
+      button { display:block; margin-top: 10px;}
+
+      #resultCount {
+        margin: 10px 0;
+        height:20px;
+      }
+
+      #right {
+        grid-area: right;
+        background-color: #fff;
+      }
+
+      .card {
+        display:block;
+        background-color: #efefef;
+        width: 85%;
+        margin: 10px auto;
+        padding: 10px;
+      }
+
+      .card .description {
+        display:block;
+        margin-bottom: 10px;
+      }
+      .card .nom {
+        display:block;
+        margin-bottom: 10px;
+      }
+      .card .prenom {
+        display:block;
+        margin-bottom: 10px;
+      }
+
+      .card img {
+        display:block;
+        width: 80%;
+        height: auto;
+        margin: 0 auto;
+      }
+      .card .gn {
+        display:block;
+        margin-bottom: 10px;
+      }
+      .card .citrix {
+        display:block;
+        margin-bottom: 10px;
+      }
+      .card .mail {
+        display:block;
+        margin-bottom: 10px;
+      }
+      .card .agent {
+        display:block;
+        margin-bottom: 10px;
+      }
+      
+
+      #new-article {
+        position: absolute;
+        left:0;
+        top:0;
+        height:100%;
+        width:100%;
+        padding: 25px;
+        display:none;
+        background:#efefef;
+      }
+
+      #new-article #close {
+        position: absolute;
+        top:15px;
+        right:10%;
+        color:rgb(0, 0, 150);
+        cursor:pointer;
+      }
+
+      #new-article-form {
+        position:relative;
+        top:10%;
+        width: 75%;
+        margin:0 auto;
+      }
+
+      #new-article-form label {
+        display:block;
+        margin-top:10px;
+      }
+
+      #new-article-form textarea {
+        height: 150px;
+      }
+
+      #new-article-form input, textarea {
+        width:90%;
+      }
+
+      #confirmation {
+        margin-top: 10px;
+        font-weight: bold;
+      }
+
+      .success { color: rgb(0,150,0); }
+
+      .hide { display: none; }
+
+      <!-- Google addon styles, to take effect after the page's -->
+    </style>
+  </head>
+  <body>
+    <div id="wrapper">
+      <div id="left">
+        <form id="search-form">
+          <h2>Indice: </h2>
+          <select id="select" name="platform"></select>
+
+          <h2>Nom: </h2>
+          <input type="text" name="nom" placeholder="nom / prénom"/>
+
+          <button type="submit" class="action" id="submit" onclick="event.preventDefault(); google.script.run.withSuccessHandler(displayResults).getResources(this.parentNode)">Recherche</button>
+        </form>
+        <button class="create" id="new-article-button" onclick="$('#new-article').show()">Ajout article</button>
+        <div id="resultCount"></div>
+        <hr />
+        <h2>Liens Utiles</h2>
+        
+        <ul>
+        <li><a href="#">Salesforce</a></li>
+        <li><a href="#">Homeserve</a></li>
+        <li><a href="#">Inc</a></li>
+        </ul>
+        <!-- Liens au choix dans la sidebar de gauche -->
+      </div>
+      <div id="right">
+        <h2 id="title"></h2>
+        <div id="results"></div>
+      </div>
+    </div>
+    <div id="new-article">
+      
+      <form id="new-article-form">
+        <p style="display:inline-block">* denotes a required element</p>
+        <span id="close" onclick="$('#new-article').hide()">[close]</span>
+        <label>Indice*</label>
+        <select id="new-article-select" name="indice"></select>
+        <label>Nom*</label>
+        <input type="text" name="nom" required />
+        <label>Prénom*</label>
+        <input type="text" name="prenom" required/>
+        <label>Mail</label>
+        <input type="text" name="mail" />
+        <label>Agent</label>
+        <input type="text" name="agent" />
+        <label>GN</label>
+        <input type="text" name="gn" required />
+        <label>CITRIX</label>
+        <input type="text" name="citrix" required />
+        <label>Instructions (HTML formatting accepted)*</label>
+        <textarea name="description" required></textarea>
+
+        <button class="create" type="submit" onclick="event.preventDefault(); google.script.run.withSuccessHandler(confirm).withFailureHandler(err).addNewArticle(this.parentNode);">Submit</button>
+      </form>
+      <div id="confirmation"></div>
+    </div>
+    <script type="text/javascript">
+      $(document).ready(function() {
+        google.script.run.withSuccessHandler(isAuth).getAuth();
+        google.script.run.withSuccessHandler(buildPlatformList).getPlatforms();
+        var data = <?!= data ?>;
+        
+        if(!jQuery.isEmptyObject(data)) {
+          google.script.run.withSuccessHandler(displayResults).getResources(data);
+        }
+      })
+
+      function isAuth(user) {
+        if(!user) {
+          $("#new-article-button").hide();
+        }
+      }
+
+      function err(msg) {
+        console.log(msg);
+        $("#confirmation").toggleClass("error").text(msg);
+
+        setTimeout(function() {
+          $("#confirmation").toggleClss("error").empty();
+        }, 3000);
+      }
+
+      function confirm(msg) {
+        $("#confirmation").toggleClass("success").text(msg);
+
+        setTimeout(function() {
+          $("#new-article-form")[0].reset();
+          $("#confirmation").toggleClass("success").empty();
+        }, 3000);
+      }
+
+      function buildPlatformList(data) {
+        var select = $("#select");
+        var newSelect = $("#new-article-select");
+        for(var i=0; i<data.length; i++) {
+          var option = "<option>" + data[i].toString() + "</option>";
+          select.append(option);
+          newSelect.append(option);
+        }
+      }
+
+      function displayResults(data) {
+
+        $("#results").empty();
+        $("#resultCount").empty();
+        var result;
+
+        (data.length > 0 && data.length < 2) ? result="match" : result="matches";
+
+        if(data.length == 0) {
+          $("#results").append("<div class='card' style='text-align:center'><h2 class='title'>Hum..je ne trouve pas :/ sorry.</h2><p>retente ta chance.</p><img src='https://cdn.dribbble.com/users/37530/screenshots/2485318/no-results.png' /></div>");
+        } else {
+
+          for(var i=0; i<data.length; i++) {
+            var container = document.createElement("div");
+            container.innerHTML = Card.TEMPLATE;
+            $("#results").append(container);
+
+            var div = container.children[0];
+            div.querySelector(".nom").innerHTML = data[i].nom;
+            div.querySelector(".prenom").innerHTML = data[i].prenom;
+            div.querySelector(".mail").innerHTML = data[i].mail;
+            div.querySelector(".agent").innerHTML = data[i].agent;
+            div.querySelector(".gn").innerHTML = data[i].gn;
+            div.querySelector(".citrix").innerHTML = data[i].citrix;
+            div.querySelector(".description").innerHTML = data[i].description;
+            if(data[i].img) {
+              div.querySelector(".img").children[0].setAttribute("src", data[i].img)
+            }
+          }
+        }
+        $("#resultCount").append("Found " + data.length + " " + result);
+      }
+
+      function Card() {
+        this.submitQuery = $("#submit");
+      }
+
+      Card.TEMPLATE =
+        '<div class="card">' +
+          '<div class="nom"></div>' +
+          '<div class="prenom"></div>' +
+          '<div class="mail"></div>' +
+          '<div class="agent"></div>' +
+          '<div class="gn"></div>' +
+          '<div class="citrix"></div>' +
+          '<div class="description"></div>' +
+        '</div>';
+
+
+    </script>
+  </body>
+</html>
